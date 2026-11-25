@@ -1,0 +1,37 @@
+flowchart LR
+    subgraph VNET["Azure VNet: vnet-poc 10.10.0.0/24 (Korea Central) - 온프렘 대체"]
+        subgraph SNETGW["snet-gw 10.10.0.0/27"]
+            VM["vm-opdg (D4s_v5, 10.10.0.4)<br/>On-premises Data Gateway: opdg-poc-01<br/>SQL Server 2022 Express (SAP BW 대체)"]
+        end
+        subgraph SNETPE["snet-pe 10.10.0.32/27"]
+            PE["Private Endpoint: pe-ws-poc-wspl<br/>group: workspace<br/>10.10.0.36~41"]
+        end
+        DNS["Private DNS Zone<br/>privatelink.fabric.microsoft.com"]
+        NAT["NAT Gateway<br/>natgw-poc"]
+    end
+
+    subgraph AZPUB["Microsoft Public Endpoints"]
+        RELAY["Azure Relay<br/>*.servicebus.windows.net<br/>(Gateway 제어 채널)"]
+        PUBAPI["api.fabric.microsoft.com<br/>onelake.dfs.fabric.microsoft.com"]
+    end
+
+    subgraph FABRIC["Microsoft Fabric (F2)"]
+        PLS["pls-ws-poc-wspl<br/>Microsoft.Fabric/privateLinkServicesForFabric"]
+        subgraph WSB["ws-poc-baseline (Inbound: Allow)"]
+            PLB["pl_copy_opdg_sql"] --> LHB[("lh_poc")]
+        end
+        subgraph WSW["ws-poc-wspl (Inbound: Deny)"]
+            PLW["pl_copy_opdg_sql"] --> LHW[("lh_poc")]
+        end
+    end
+
+    CLIENT["외부 클라이언트<br/>(Public Internet)"]
+
+    VM -- "① 파이프라인 실행 (workspace FQDN)" --> PE
+    PE --> PLS --> WSW
+    VM -. "DNS 조회" .-> DNS
+    VM -- "② 제어 채널 (Outbound 443)" --> NAT --> RELAY
+    RELAY <--> FABRIC
+    VM -- "③ OneLake 쓰기<br/>{ws}.z18.dfs → 10.10.0.39" --> PE
+    VM -- "S0: Public 경로 적재" --> NAT --> PUBAPI --> WSB
+    CLIENT -. "403 RequestDeniedByInboundPolicy" .-x WSW

@@ -1,0 +1,46 @@
+{
+  "scenarios": [
+    {
+      "ID": "S0",
+      "Condition": "Private Link off (ws-poc-baseline)",
+      "Test": "Copy pipeline: SQL Server via OPDG -> Lakehouse table, triggered from public API",
+      "Result": "Succeeded",
+      "Evidence": "rowsRead=100000, rowsCopied=100000, 38.6s"
+    },
+    {
+      "ID": "S3-pre",
+      "Condition": "ws-poc-wspl before Private Link (control)",
+      "Test": "Same pipeline in ws-poc-wspl",
+      "Result": "Succeeded",
+      "Evidence": "rowsCopied=100000, 27.5s"
+    },
+    {
+      "ID": "S3-1",
+      "Condition": "PLS/PE/DNS created, tenant setting 'Configure workspace-level inbound network rules' OFF",
+      "Test": "Set inbound Deny / trigger via workspace FQDN from VM",
+      "Result": "Blocked",
+      "Evidence": "PUT communicationPolicy -> 403 InboundRestrictionNotEligible (same on empty workspace); workspace FQDN call -> 403 RequestDeniedByInboundPolicy"
+    },
+    {
+      "ID": "S3-2",
+      "Condition": "Tenant setting ON, ws-poc-wspl inbound Deny",
+      "Test": "Public API GET items from outside VNet",
+      "Result": "Denied (expected)",
+      "Evidence": "403 RequestDeniedByInboundPolicy (effective immediately)"
+    },
+    {
+      "ID": "S3-a",
+      "Condition": "Tenant setting ON, ws-poc-wspl inbound Deny",
+      "Test": "Copy pipeline (OPDG source) triggered from VM via workspace FQDN (private endpoint)",
+      "Result": "Succeeded",
+      "Evidence": "Job Completed, rowsRead=100000, rowsCopied=100000; OPDG wrote to {ws}.z18.dfs.fabric.microsoft.com -> 10.10.0.39 (PE)"
+    },
+    {
+      "ID": "S3-b",
+      "Condition": "Tenant setting ON, ws-poc-wspl inbound Deny",
+      "Test": "Dataflow Gen2 via OPDG",
+      "Result": "Not executed",
+      "Evidence": "Docs: Dataflow Gen2 in workspace-level PL requires VNet data gateway"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+flowchart LR
+    subgraph ONPREM["고객사 온프렘"]
+        SAP["SAP BW"]
+        OPDG["On-premises Data Gateway<br/>(Cluster 권장)"]
+        ODNS["온프렘 DNS<br/>조건부 전달:<br/>*.fabric.microsoft.com"]
+        FW["방화벽 / Proxy<br/>Outbound 443"]
+        SAP --> OPDG
+    end
+
+    subgraph AZURE["Azure Hub VNet"]
+        ER["ExpressRoute / VPN Gateway"]
+        RES["Azure DNS Private Resolver<br/>(Inbound endpoint)"]
+        PZ["Private DNS Zone<br/>privatelink.fabric.microsoft.com"]
+        PE["Private Endpoint<br/>(workspace-level)"]
+    end
+
+    subgraph MS["Microsoft Public Endpoints"]
+        RELAY["Azure Relay<br/>*.servicebus.windows.net"]
+    end
+
+    subgraph FABRIC["Microsoft Fabric"]
+        WS["적재 대상 Workspace<br/>Inbound: Deny<br/>Pipeline / Copy Job → Lakehouse"]
+    end
+
+    OPDG -- "OneLake 쓰기 / API<br/>(workspace FQDN)" --> ER --> PE --> WS
+    OPDG -. "DNS" .-> ODNS -.-> RES -.-> PZ
+    OPDG -- "제어 채널" --> FW --> RELAY <--> WS
